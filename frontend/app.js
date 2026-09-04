@@ -3,102 +3,134 @@
  * Integrates directly with FastAPI Backend (http://127.0.0.1:8000)
  */
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+// Safe API Base URL (works for localhost, 127.0.0.1, or custom host)
+const API_BASE_URL = (window.location.origin && window.location.origin.startsWith("http")) 
+    ? window.location.origin 
+    : "http://127.0.0.1:8000";
 
-// DOM Elements
-const dropzone = document.getElementById("dropzone");
-const fileInput = document.getElementById("fileInput");
-const uploadProgress = document.getElementById("uploadProgress");
-const progressText = document.getElementById("progressText");
-const documentList = document.getElementById("documentList");
-const emptyDocsState = document.getElementById("emptyDocsState");
-const docCountBadge = document.getElementById("docCountBadge");
-const statusDot = document.getElementById("statusDot");
-const statusText = document.getElementById("statusText");
+console.log("[DocChat] API Base URL configured:", API_BASE_URL);
 
-const chatContainer = document.getElementById("chatContainer");
-const welcomeHero = document.getElementById("welcomeHero");
-const messageStream = document.getElementById("messageStream");
-const promptForm = document.getElementById("promptForm");
-const queryInput = document.getElementById("queryInput");
-const sendBtn = document.getElementById("sendBtn");
-const clearChatBtn = document.getElementById("clearChatBtn");
-const toastContainer = document.getElementById("toastContainer");
+// State
+let indexedDocuments = [];
+try {
+    indexedDocuments = JSON.parse(localStorage.getItem("docchat_documents") || "[]");
+} catch (e) {
+    indexedDocuments = [];
+}
 
-// In-Memory & LocalStorage State
-let indexedDocuments = JSON.parse(localStorage.getItem("docchat_documents") || "[]");
-let chatHistory = [];
+function initApp() {
+    console.log("[DocChat] Initializing application...");
+    
+    // DOM Elements
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const promptForm = document.getElementById("promptForm");
+    const queryInput = document.getElementById("queryInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const clearChatBtn = document.getElementById("clearChatBtn");
 
-// Initialize Application
-document.addEventListener("DOMContentLoaded", () => {
+    if (!dropzone || !queryInput || !promptForm) {
+        console.error("[DocChat] Critical DOM elements missing!");
+        return;
+    }
+
+    // 1. Initial Render & Health Check
     renderDocuments();
     checkBackendHealth();
-    setInterval(checkBackendHealth, 10000);
-    setupEventListeners();
+    setInterval(checkBackendHealth, 8000);
     autoResizeTextarea();
-});
 
-function setupEventListeners() {
-    // Dropzone Events
-    dropzone.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", handleFileSelection);
+    // 2. Dropzone & File Upload Listeners
+    dropzone.onclick = () => {
+        console.log("[DocChat] Dropzone clicked, opening file dialog...");
+        fileInput.click();
+    };
 
-    dropzone.addEventListener("dragover", (e) => {
+    fileInput.onchange = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            console.log("[DocChat] File selected:", e.target.files[0].name);
+            uploadFile(e.target.files[0]);
+        }
+    };
+
+    dropzone.ondragover = (e) => {
         e.preventDefault();
         dropzone.classList.add("dragover");
-    });
+    };
 
-    dropzone.addEventListener("dragleave", () => {
+    dropzone.ondragleave = () => {
         dropzone.classList.remove("dragover");
-    });
+    };
 
-    dropzone.addEventListener("drop", (e) => {
+    dropzone.ondrop = (e) => {
         e.preventDefault();
         dropzone.classList.remove("dragover");
-        if (e.dataTransfer.files.length > 0) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            console.log("[DocChat] File dropped:", e.dataTransfer.files[0].name);
             uploadFile(e.dataTransfer.files[0]);
         }
-    });
+    };
 
-    // Prompt Submission
-    promptForm.addEventListener("submit", (e) => {
+    // 3. Prompt Submission & Enter Key Listener
+    promptForm.onsubmit = (e) => {
         e.preventDefault();
+        console.log("[DocChat] Prompt form submitted via button/enter");
         handleUserQuery();
-    });
+    };
 
-    queryInput.addEventListener("keydown", (e) => {
+    queryInput.onkeydown = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
+            console.log("[DocChat] Enter key pressed in query input");
             handleUserQuery();
         }
-    });
+    };
 
-    queryInput.addEventListener("input", autoResizeTextarea);
+    queryInput.oninput = autoResizeTextarea;
 
-    // Starter Prompt Chips
+    // 4. Starter Prompt Chips
     document.querySelectorAll(".prompt-chip").forEach(chip => {
-        chip.addEventListener("click", () => {
+        chip.onclick = () => {
             const prompt = chip.getAttribute("data-prompt");
-            queryInput.value = prompt;
-            autoResizeTextarea();
-            handleUserQuery();
-        });
+            if (prompt) {
+                queryInput.value = prompt;
+                autoResizeTextarea();
+                handleUserQuery();
+            }
+        };
     });
 
-    // Clear Chat
-    clearChatBtn.addEventListener("click", clearChat);
+    // 5. Clear Chat
+    if (clearChatBtn) {
+        clearChatBtn.onclick = clearChat;
+    }
+
+    console.log("[DocChat] Application initialized successfully with all event listeners!");
+}
+
+// Ensure initApp runs regardless of document readyState
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+} else {
+    initApp();
 }
 
 // Auto-resizing textarea
 function autoResizeTextarea() {
+    const queryInput = document.getElementById("queryInput");
+    if (!queryInput) return;
     queryInput.style.height = "auto";
     queryInput.style.height = Math.min(queryInput.scrollHeight, 160) + "px";
 }
 
 // Check Backend Health
 async function checkBackendHealth() {
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    if (!statusDot || !statusText) return;
+
     try {
-        const response = await fetch(`${API_BASE_URL}/`);
+        const response = await fetch(`${API_BASE_URL}/docs`);
         if (response.ok) {
             statusDot.className = "status-dot online";
             statusText.textContent = "FastAPI Live (8000)";
@@ -111,15 +143,12 @@ async function checkBackendHealth() {
     }
 }
 
-// Handle File Selection
-function handleFileSelection(e) {
-    if (e.target.files.length > 0) {
-        uploadFile(e.target.files[0]);
-    }
-}
-
 // Upload & Index Document
 async function uploadFile(file) {
+    const uploadProgress = document.getElementById("uploadProgress");
+    const progressText = document.getElementById("progressText");
+    const fileInput = document.getElementById("fileInput");
+
     const validExtensions = [".pdf", ".txt"];
     const ext = "." + file.name.split(".").pop().toLowerCase();
     
@@ -128,19 +157,21 @@ async function uploadFile(file) {
         return;
     }
 
-    uploadProgress.style.display = "flex";
-    progressText.textContent = `Uploading ${file.name}...`;
+    if (uploadProgress) uploadProgress.style.display = "flex";
+    if (progressText) progressText.textContent = `Uploading & indexing ${file.name}...`;
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
+        console.log(`[DocChat] Sending POST request to ${API_BASE_URL}/api/v1/documents/upload`);
         const response = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
             method: "POST",
             body: formData
         });
 
         const data = await response.json();
+        console.log("[DocChat] Upload response:", data);
 
         if (!response.ok) {
             throw new Error(data.detail || "Upload failed");
@@ -154,7 +185,6 @@ async function uploadFile(file) {
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
-        // Prevent duplicate file entries in UI
         indexedDocuments = indexedDocuments.filter(d => d.filename !== docEntry.filename);
         indexedDocuments.unshift(docEntry);
         localStorage.setItem("docchat_documents", JSON.stringify(indexedDocuments));
@@ -163,26 +193,36 @@ async function uploadFile(file) {
         showToast(`Indexed ${data.chunks_indexed} chunks for ${data.filename}!`, "success");
 
     } catch (err) {
+        console.error("[DocChat] Upload error:", err);
         showToast(err.message || "Failed to upload document", "error");
     } finally {
-        uploadProgress.style.display = "none";
-        fileInput.value = "";
+        if (uploadProgress) uploadProgress.style.display = "none";
+        if (fileInput) fileInput.value = "";
     }
 }
 
 // Render Active Document Cards
 function renderDocuments() {
+    const documentList = document.getElementById("documentList");
+    const emptyDocsState = document.getElementById("emptyDocsState");
+    const docCountBadge = document.getElementById("docCountBadge");
+
+    if (!documentList) return;
+
     documentList.innerHTML = "";
 
     if (indexedDocuments.length === 0) {
-        emptyDocsState.style.display = "flex";
-        documentList.appendChild(emptyDocsState);
-        docCountBadge.textContent = "0 files";
+        if (emptyDocsState) {
+            emptyDocsState.style.display = "flex";
+            documentList.appendChild(emptyDocsState);
+        }
+        if (docCountBadge) docCountBadge.textContent = "0 files";
         return;
     }
 
-    emptyDocsState.style.display = "none";
-    docCountBadge.textContent = `${indexedDocuments.length} file${indexedDocuments.length > 1 ? 's' : ''}`;
+    if (docCountBadge) {
+        docCountBadge.textContent = `${indexedDocuments.length} file${indexedDocuments.length > 1 ? 's' : ''}`;
+    }
 
     indexedDocuments.forEach(doc => {
         const card = document.createElement("div");
@@ -196,7 +236,7 @@ function renderDocuments() {
             </div>
             <div class="doc-info">
                 <div class="doc-name" title="${doc.filename}">${doc.filename}</div>
-                <div class="doc-meta-badge">✓ ${doc.chunks} chunks indexed</div>
+                <div class="doc-meta-badge">&#10003; ${doc.chunks} chunks indexed</div>
             </div>
         `;
         documentList.appendChild(card);
@@ -205,23 +245,30 @@ function renderDocuments() {
 
 // Handle User Chat Query
 async function handleUserQuery() {
+    const queryInput = document.getElementById("queryInput");
+    const welcomeHero = document.getElementById("welcomeHero");
+    const sendBtn = document.getElementById("sendBtn");
+
+    if (!queryInput) return;
     const question = queryInput.value.trim();
     if (!question) return;
 
-    // Hide welcome hero on first message
-    welcomeHero.style.display = "none";
+    console.log("[DocChat] Processing user query:", question);
 
-    // Add user message to UI
+    if (welcomeHero) {
+        welcomeHero.style.display = "none";
+    }
+
     appendMessage("user", question);
     queryInput.value = "";
     autoResizeTextarea();
-    sendBtn.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
 
-    // Add temporary AI thinking loader
     const loadingId = appendLoadingIndicator();
     scrollToBottom();
 
     try {
+        console.log(`[DocChat] Sending POST request to ${API_BASE_URL}/api/v1/chat`);
         const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -229,8 +276,8 @@ async function handleUserQuery() {
         });
 
         const data = await response.json();
+        console.log("[DocChat] Chat response:", data);
 
-        // Remove thinking loader
         removeMessage(loadingId);
 
         if (!response.ok) {
@@ -240,17 +287,22 @@ async function handleUserQuery() {
         appendMessage("ai", data.answer);
 
     } catch (err) {
+        console.error("[DocChat] Chat error:", err);
         removeMessage(loadingId);
         appendMessage("ai", `⚠️ **Error:** ${err.message}`);
         showToast(err.message, "error");
     } finally {
-        sendBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
         scrollToBottom();
+        queryInput.focus();
     }
 }
 
 // Append Message Row to Stream
 function appendMessage(sender, text) {
+    const messageStream = document.getElementById("messageStream");
+    if (!messageStream) return;
+
     const msgId = "msg-" + Date.now();
     const row = document.createElement("div");
     row.className = `message-row ${sender}`;
@@ -274,6 +326,9 @@ function appendMessage(sender, text) {
 
 // Append Thinking / Loading Indicator
 function appendLoadingIndicator() {
+    const messageStream = document.getElementById("messageStream");
+    if (!messageStream) return "";
+
     const loadId = "loading-" + Date.now();
     const row = document.createElement("div");
     row.className = "message-row ai";
@@ -315,8 +370,7 @@ function formatMarkdown(text) {
         .replace(/>/g, "&gt;");
 
     // Code blocks ```code```
-    html = html.replace(/```([a-z]*)
-([\s\S]*?)```/g, (match, lang, code) => {
+    html = html.replace(/```([a-z]*)\n([\s\S]*?)```/g, (match, lang, code) => {
         return `<pre><code>${code.trim()}</code></pre>`;
     });
 
@@ -331,12 +385,9 @@ function formatMarkdown(text) {
     html = html.replace(/(<li>.*<\/li>)/s, "<ul>$1</ul>");
 
     // Paragraphs
-    html = html.split("
-
-").map(para => {
+    html = html.split("\n\n").map(para => {
         if (!para.startsWith("<pre>") && !para.startsWith("<ul>")) {
-            return `<p>${para.replace(/
-/g, "<br>")}</p>`;
+            return `<p>${para.replace(/\n/g, "<br>")}</p>`;
         }
         return para;
     }).join("");
@@ -345,16 +396,24 @@ function formatMarkdown(text) {
 }
 
 function scrollToBottom() {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    const chatContainer = document.getElementById("chatContainer");
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 }
 
 function clearChat() {
-    messageStream.innerHTML = "";
-    welcomeHero.style.display = "flex";
-    showToast("Chat cleared", "success");
+    const messageStream = document.getElementById("messageStream");
+    const welcomeHero = document.getElementById("welcomeHero");
+    if (messageStream) messageStream.innerHTML = "";
+    if (welcomeHero) welcomeHero.style.display = "flex";
+    showToast("Chat history cleared", "success");
 }
 
 function showToast(message, type = "success") {
+    const toastContainer = document.getElementById("toastContainer");
+    if (!toastContainer) return;
+
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.textContent = message;
