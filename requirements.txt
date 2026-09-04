@@ -1,0 +1,16 @@
+langchain
+langchain-community
+langchain-groq
+langchain-text-splitters
+sentence-transformers
+faiss-cpu
+pypdf
+python-dotenv
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+requests
+aiofiles
+jinja2
+streamlit
