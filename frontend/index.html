@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocChat AI - Enterprise Conversational Document Intelligence</title>
+    <meta name="description" content="Intelligent document assistant with sub-second RAG retrieval and citation-grounded synthesis.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Brand Header -->
+            <div class="brand-header">
+                <div class="logo-badge">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <line x1="10" y1="9" x2="8" y2="9"/>
+                    </svg>
+                </div>
+                <div class="brand-info">
+                    <h2>DocChat <span class="badge-ai">AI</span></h2>
+                    <p class="brand-tagline">Enterprise RAG Engine</p>
+                </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="section-title">Ingest Knowledge</div>
+            <div class="upload-dropzone" id="dropzone">
+                <input type="file" id="fileInput" accept=".pdf,.txt" style="display: none;">
+                <div class="dropzone-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <p class="dropzone-primary"><strong>Click to upload</strong> or drag & drop</p>
+                <p class="dropzone-sub">PDF or TXT documents</p>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                    <span class="progress-text" id="progressText">Uploading & indexing chunks...</span>
+                </div>
+            </div>
+
+            <!-- Active Documents Section -->
+            <div class="section-header">
+                <span class="section-title">Active Documents</span>
+                <span class="doc-count-badge" id="docCountBadge">0 files</span>
+            </div>
+            <div class="document-list" id="documentList">
+                <div class="empty-docs-state" id="emptyDocsState">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                        <polyline points="13 2 13 9 20 9"></polyline>
+                    </svg>
+                    <span>No documents indexed yet. Upload a PDF or TXT to begin.</span>
+                </div>
+            </div>
+
+            <!-- System Health Footer -->
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span class="status-text" id="statusText">Checking Backend...</span>
+                </div>
+                <div class="system-stats">Groq Compound • FAISS</div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-workspace">
+            <!-- Header Bar -->
+            <header class="workspace-header">
+                <div class="header-title-container">
+                    <h1 class="header-title">Document Intelligence Workspace</h1>
+                    <span class="header-subtitle">Real-time semantic retrieval with grounded context</span>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-clear-chat" id="clearChatBtn" title="Clear conversation history">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Clear Chat
+                    </button>
+                </div>
+            </header>
+
+            <!-- Chat History Area -->
+            <div class="chat-container" id="chatContainer">
+                <!-- Welcome Hero -->
+                <div class="welcome-hero" id="welcomeHero">
+                    <div class="hero-logo-glow">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </div>
+                    <h2>Welcome to <span class="gradient-text">DocChat AI</span></h2>
+                    <p>Ask complex questions, synthesize summaries, and extract insights from your indexed documents with zero hallucination.</p>
+                    
+                    <!-- Starter Prompts -->
+                    <div class="starter-prompts-grid">
+                        <button class="prompt-chip" data-prompt="Summarize the key highlights of the uploaded document.">
+                            <span class="chip-icon">📄</span>
+                            <span class="chip-text">Summarize key highlights</span>
+                        </button>
+                        <button class="prompt-chip" data-prompt="What are the main technical skills or qualifications mentioned?">
+                            <span class="chip-icon">🎯</span>
+                            <span class="chip-text">Extract key skills & qualifications</span>
+                        </button>
+                        <button class="prompt-chip" data-prompt="What are the important dates, milestones, or project deliverables?">
+                            <span class="chip-icon">📅</span>
+                            <span class="chip-text">Find important dates & milestones</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dynamic Message Stream -->
+                <div class="message-stream" id="messageStream"></div>
+            </div>
+
+            <!-- Floating Prompt Bar -->
+            <footer class="prompt-bar-container">
+                <form class="prompt-form" id="promptForm">
+                    <div class="prompt-input-wrapper">
+                        <textarea 
+                            id="queryInput" 
+                            class="prompt-textarea" 
+                            rows="1" 
+                            placeholder="Ask any question about your documents... (Press Enter to send, Shift+Enter for new line)"
+                            required
+                        ></textarea>
+                        <button type="submit" class="btn-send" id="sendBtn" title="Send Question">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+                <div class="prompt-footer-meta">
+                    <span>⚡ Sub-second Groq Inference</span>
+                    <span>•</span>
+                    <span>🛡️ Strict Context Grounding</span>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
