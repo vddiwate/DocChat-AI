@@ -1,5 +1,5 @@
 """Document controller exposing REST API endpoints for document upload and ingestion."""
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, File, Request, UploadFile, status
 
 from backend.api.models.schemas import DocumentUploadResponse
 from backend.api.services.document_service import DocumentService
@@ -12,7 +12,11 @@ document_service = DocumentService()
 
 
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(req: Request, file: UploadFile = File(...)):
     """Handles multipart file upload, disk persistence, and vector store indexing."""
-    logger.info(f"Received upload request for file: {file.filename}")
-    return document_service.process_uploaded_document(file)
+    request_id = getattr(req.state, "request_id", None)
+    logger.info(f"[{request_id}] Received upload request for file: {file.filename}")
+    response = document_service.process_uploaded_document(file)
+    if request_id:
+        response.request_id = request_id
+    return response

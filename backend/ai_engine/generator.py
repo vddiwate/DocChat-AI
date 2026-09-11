@@ -1,5 +1,5 @@
 """Generation module connecting retriever, prompt templates, and Groq LLM using LCEL."""
-from typing import List
+from typing import Generator, List
 
 from dotenv import load_dotenv
 from langchain_core.documents import Document
@@ -85,3 +85,21 @@ class RAGGenerator:
         except Exception as e:
             logger.exception(f"Error during response generation for query '{query}': {e}")
             raise RuntimeError(f"Generation error: {e}") from e
+
+    def stream_answer(self, query: str) -> Generator[str, None, None]:
+        """Streams generated answer tokens progressively for a user query."""
+        if not query or not query.strip():
+            error_msg = "Query cannot be empty."
+            logger.warning(error_msg)
+            yield error_msg
+            return
+
+        try:
+            logger.info(f"Streaming answer for query: '{query}'")
+            for chunk in self._chain.stream(query):
+                yield chunk
+            logger.info("Answer streaming completed successfully.")
+
+        except Exception as e:
+            logger.exception(f"Error during streaming for query '{query}': {e}")
+            yield f"\n\n[Error generating stream: {e}]"
