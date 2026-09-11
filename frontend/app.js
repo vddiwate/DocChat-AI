@@ -1,14 +1,16 @@
 /**
- * DocChat AI - Interactive Web Application Logic
+ * DocChat AI - Enterprise Web Application Logic
  * Integrates directly with FastAPI Backend (http://127.0.0.1:8000)
+ * Uses Unified Canonical Chat Endpoint (POST /api/v1/chat with stream=true)
+ * Full Support for Correlation IDs (X-Request-ID) and Standardized RFC-7807 Error Handlers
  */
 
-// Safe API Base URL (works for localhost, 127.0.0.1, or custom host)
-const API_BASE_URL = (window.location.origin && window.location.origin.startsWith("http")) 
+// Robust API Base URL detection
+const API_BASE_URL = (window.location.protocol.startsWith("http") && (window.location.port === "8000" || window.location.port === "")) 
     ? window.location.origin 
     : "http://127.0.0.1:8000";
 
-console.log("[DocChat] API Base URL configured:", API_BASE_URL);
+console.log("[DocChat Enterprise] API Base URL configured:", API_BASE_URL);
 
 // State
 let indexedDocuments = [];
@@ -74,14 +76,12 @@ function initApp() {
     // 3. Prompt Submission & Enter Key Listener
     promptForm.onsubmit = (e) => {
         e.preventDefault();
-        console.log("[DocChat] Prompt form submitted via button/enter");
         handleUserQuery();
     };
 
     queryInput.onkeydown = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            console.log("[DocChat] Enter key pressed in query input");
             handleUserQuery();
         }
     };
@@ -105,7 +105,7 @@ function initApp() {
         clearChatBtn.onclick = clearChat;
     }
 
-    console.log("[DocChat] Application initialized successfully with all event listeners!");
+    console.log("[DocChat] Enterprise application initialized successfully!");
 }
 
 // Ensure initApp runs regardless of document readyState
@@ -164,7 +164,7 @@ async function uploadFile(file) {
     formData.append("file", file);
 
     try {
-        console.log(`[DocChat] Sending POST request to ${API_BASE_URL}/api/v1/documents/upload`);
+        console.log(`[DocChat] Sending upload to ${API_BASE_URL}/api/v1/documents/upload`);
         const response = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
             method: "POST",
             body: formData
@@ -174,7 +174,8 @@ async function uploadFile(file) {
         console.log("[DocChat] Upload response:", data);
 
         if (!response.ok) {
-            throw new Error(data.detail || "Upload failed");
+            const errorMsg = data.message || data.detail || "Upload failed";
+            throw new Error(errorMsg);
         }
 
         // Add to active docs
@@ -243,7 +244,7 @@ function renderDocuments() {
     });
 }
 
-// Handle User Chat Query
+// Handle Real-Time Streaming User Chat Query via Unified Endpoint
 async function handleUserQuery() {
     const queryInput = document.getElementById("queryInput");
     const welcomeHero = document.getElementById("welcomeHero");
@@ -253,44 +254,142 @@ async function handleUserQuery() {
     const question = queryInput.value.trim();
     if (!question) return;
 
-    console.log("[DocChat] Processing user query:", question);
+    console.log("[DocChat] Submitting query to unified endpoint:", question);
 
     if (welcomeHero) {
         welcomeHero.style.display = "none";
     }
 
+    // Add user message to UI
     appendMessage("user", question);
     queryInput.value = "";
     autoResizeTextarea();
     if (sendBtn) sendBtn.disabled = true;
 
-    const loadingId = appendLoadingIndicator();
+    // Create placeholder AI message bubble for streaming
+    const aiMsgId = appendMessage("ai", "");
+    const aiBubble = document.querySelector(`#${aiMsgId} .msg-bubble`);
+    
+    // Show typing dots while waiting for first token
+    if (aiBubble) {
+        aiBubble.innerHTML = `
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        `;
+    }
     scrollToBottom();
 
+    let accumulatedText = "";
+    let firstTokenReceived = false;
+    let requestId = null;
+
     try {
-        console.log(`[DocChat] Sending POST request to ${API_BASE_URL}/api/v1/chat`);
+        console.log(`[DocChat] Requesting unified chat: ${API_BASE_URL}/api/v1/chat (stream: true)`);
         const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question })
+            headers: { 
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream, application/json"
+            },
+            body: JSON.stringify({ question, stream: true })
         });
 
-        const data = await response.json();
-        console.log("[DocChat] Chat response:", data);
-
-        removeMessage(loadingId);
+        requestId = response.headers.get("X-Request-ID");
 
         if (!response.ok) {
-            throw new Error(data.detail || "Failed to generate answer");
+            let errorObj = {
+                status_code: response.status,
+                error_code: `HTTP_${response.status}`,
+                message: `Server returned error ${response.status}`,
+                request_id: requestId
+            };
+
+            try {
+                const errData = await response.json();
+                if (errData) {
+                    errorObj.message = errData.message || errData.detail || errorObj.message;
+                    errorObj.error_code = errData.error_code || errorObj.error_code;
+                    errorObj.request_id = errData.request_id || requestId;
+                }
+            } catch (e) {}
+
+            renderEnterpriseError(aiBubble, errorObj);
+            showToast(errorObj.message, "error");
+            return;
         }
 
-        appendMessage("ai", data.answer);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop(); // keep incomplete trailing line in buffer
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+                const dataStr = trimmed.slice(5).trim();
+                if (dataStr === "[DONE]") {
+                    console.log("[DocChat] SSE Stream completed: [DONE]");
+                    break;
+                }
+
+                try {
+                    const parsed = JSON.parse(dataStr);
+                    if (parsed.error) {
+                        const errDetails = typeof parsed.error === "object" ? parsed.error : { message: parsed.error };
+                        renderEnterpriseError(aiBubble, {
+                            status_code: 400,
+                            error_code: errDetails.code || "CHAT_ERROR",
+                            message: errDetails.message || "An error occurred during generation.",
+                            request_id: errDetails.request_id || requestId
+                        });
+                        showToast(errDetails.message || "Chat error", "error");
+                        return;
+                    }
+
+                    if (parsed.token) {
+                        if (!firstTokenReceived) {
+                            firstTokenReceived = true;
+                            if (aiBubble) aiBubble.innerHTML = "";
+                        }
+                        accumulatedText += parsed.token;
+                        if (aiBubble) {
+                            aiBubble.innerHTML = formatMarkdown(accumulatedText);
+                        }
+                        scrollToBottom();
+                    }
+                } catch (parseErr) {
+                    if (parseErr.message && !parseErr.message.includes("JSON")) {
+                        throw parseErr;
+                    }
+                }
+            }
+        }
+
+        // Final render after stream ends
+        if (aiBubble && accumulatedText) {
+            aiBubble.innerHTML = formatMarkdown(accumulatedText);
+        }
 
     } catch (err) {
-        console.error("[DocChat] Chat error:", err);
-        removeMessage(loadingId);
-        appendMessage("ai", `⚠️ **Error:** ${err.message}`);
-        showToast(err.message, "error");
+        console.error("[DocChat] Chat execution error:", err);
+        renderEnterpriseError(aiBubble, {
+            status_code: 500,
+            error_code: "NETWORK_OR_CLIENT_ERROR",
+            message: err.message || "Failed to communicate with DocChat API.",
+            request_id: requestId
+        });
+        showToast(err.message || "Failed to communicate with DocChat backend.", "error");
     } finally {
         if (sendBtn) sendBtn.disabled = false;
         scrollToBottom();
@@ -298,10 +397,28 @@ async function handleUserQuery() {
     }
 }
 
+// Render Enterprise Error Card in Message Stream
+function renderEnterpriseError(container, errorObj) {
+    if (!container) return;
+    const reqBadge = errorObj.request_id 
+        ? `<div style="margin-top: 8px; font-size: 11px; opacity: 0.8; font-family: monospace;">Trace ID: <code>${errorObj.request_id}</code></div>`
+        : "";
+
+    container.innerHTML = `
+        <div style="background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; padding: 10px 14px; border-radius: 6px; color: #fca5a5;">
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>⚠️ [${errorObj.error_code || 'ERROR'}]</span>
+            </div>
+            <div style="font-size: 13px; color: #f1f5f9;">${errorObj.message}</div>
+            ${reqBadge}
+        </div>
+    `;
+}
+
 // Append Message Row to Stream
 function appendMessage(sender, text) {
     const messageStream = document.getElementById("messageStream");
-    if (!messageStream) return;
+    if (!messageStream) return "";
 
     const msgId = "msg-" + Date.now();
     const row = document.createElement("div");
@@ -314,7 +431,7 @@ function appendMessage(sender, text) {
 
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
-    bubble.innerHTML = formatMarkdown(text);
+    bubble.innerHTML = text ? formatMarkdown(text) : "";
 
     row.appendChild(avatar);
     row.appendChild(bubble);
@@ -324,43 +441,7 @@ function appendMessage(sender, text) {
     return msgId;
 }
 
-// Append Thinking / Loading Indicator
-function appendLoadingIndicator() {
-    const messageStream = document.getElementById("messageStream");
-    if (!messageStream) return "";
-
-    const loadId = "loading-" + Date.now();
-    const row = document.createElement("div");
-    row.className = "message-row ai";
-    row.id = loadId;
-
-    const avatar = document.createElement("div");
-    avatar.className = "msg-avatar";
-    avatar.textContent = "AI";
-
-    const bubble = document.createElement("div");
-    bubble.className = "msg-bubble";
-    bubble.innerHTML = `
-        <div class="typing-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-    `;
-
-    row.appendChild(avatar);
-    row.appendChild(bubble);
-    messageStream.appendChild(row);
-
-    return loadId;
-}
-
-function removeMessage(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-}
-
-// Markdown Formatter (Lightweight parser)
+// Markdown Formatter
 function formatMarkdown(text) {
     if (!text) return "";
     
