@@ -18,7 +18,7 @@ class DocChatConfig:
 
     EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
 
-    GROQ_MODEL_NAME: str = os.getenv("MODEL_NAME", "groq/compound")
+    GROQ_MODEL_NAME: str = os.getenv("MODEL_NAME", "qwen/qwen3.8-27b")
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.0"))
 
     DEFAULT_CHUNK_SIZE: int = int(os.getenv("DEFAULT_CHUNK_SIZE", "400"))

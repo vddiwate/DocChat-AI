@@ -138,29 +138,56 @@
                 <div class="message-stream" id="messageStream"></div>
             </div>
 
-            <!-- Floating Prompt Bar -->
+            <!-- Floating / Fixed Prompt Bar Dock -->
             <footer class="prompt-bar-container">
-                <form class="prompt-form" id="promptForm" onsubmit="return false;">
-                    <div class="prompt-input-wrapper">
-                        <textarea 
-                            id="queryInput" 
-                            class="prompt-textarea" 
-                            rows="1" 
-                            placeholder="Ask any question about your documents... (Press Enter to send, Shift+Enter for new line)"
-                            required
-                        ></textarea>
-                        <button type="button" class="btn-send" id="sendBtn" title="Send Question" onclick="handleUserQuery()">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                        </button>
+                <div class="prompt-input-box">
+                    <textarea 
+                        id="queryInput" 
+                        class="prompt-textarea" 
+                        rows="1" 
+                        placeholder="Ask any question about your documents..."
+                        required
+                    ></textarea>
+
+                    <div class="prompt-controls-bar">
+                        <div class="controls-left">
+                            <button type="button" class="dock-pill-btn" id="addFilesBtn" title="Attach files to workspace">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                                </svg>
+                                <span>Add Files</span>
+                            </button>
+
+                            <button type="button" class="dock-pill-btn" id="webSearchBtn" title="Toggle web search">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="2" y1="12" x2="22" y2="12"/>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                </svg>
+                                <span>Web Search</span>
+                            </button>
+                        </div>
+
+                        <div class="controls-right">
+                            <div class="dock-model-selector" id="dockModelSelector" title="Active model">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"/>
+                                    <path d="M12 6v6l4 2"/>
+                                </svg>
+                                <span>GPT-4o</span>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </div>
+
+                            <button type="button" class="btn-send-blue" id="sendBtn" title="Send question (Enter)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                </form>
-                <div class="prompt-footer-meta">
-                    <span>⚡ Sub-second Groq Inference</span>
-                    <span>•</span>
-                    <span>🛡️ Strict Context Grounding</span>
                 </div>
             </footer>
         </main>
