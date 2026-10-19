@@ -1,12 +1,57 @@
+# ==============================================================================
+# DocChat Enterprise AI Platform - Git Ignore Rules
+# ==============================================================================
+
+# 1. Environment & Sensitive Credentials (NEVER COMMIT)
+.env
+.env.*
+!.env.example
+
+# 2. Virtual Environments
 venv/
 .venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# 3. Python Bytecode & Cache
 __pycache__/
-*.pyc
-.env
-.ipynb_checkpoints/
-**/my_chroma_db/
-**/my_faiss_index/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 4. Local Vector Stores & Data Storage
 **/faiss_index/
-*.log
-**/logs/
+faiss_index/
+**/my_faiss_index/
+my_faiss_index/
+**/my_chroma_db/
+my_chroma_db/
+
+# 5. Local Uploads & Data
 **/uploads/
+uploads/
+
+# 6. Logs & Diagnostics
+*.log
+logs/
+**/logs/
+*.sqlite3
+
+# 7. IDE & Operating System Files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 8. Temporary Files & Jupyter
+.ipynb_checkpoints/
+*.tmp
+*.temp

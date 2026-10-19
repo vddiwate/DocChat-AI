@@ -14,3 +14,8 @@ requests
 aiofiles
 jinja2
 streamlit
+langgraph
+sqlalchemy
+psycopg2-binary
+duckduckgo-search
+alembic

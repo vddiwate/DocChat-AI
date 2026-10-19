@@ -3,6 +3,7 @@ import datetime
 import os
 import sys
 import uuid
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +19,74 @@ from backend.core.logger import get_logger
 
 logger = get_logger("api.app")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Step-by-step system startup verification and graceful shutdown lifecycle."""
+    logger.info("=" * 70)
+    logger.info("  DocChat Enterprise AI Platform - Initializing System...")
+    logger.info(f"  Environment         : {os.getenv('ENVIRONMENT', 'production')}")
+    logger.info(f"  Active LLM Model    : {CONFIG.GROQ_MODEL_NAME}")
+    logger.info(f"  Database Host       : {CONFIG.DB_HOST}:{CONFIG.DB_PORT}")
+    logger.info(f"  Database Name       : {CONFIG.DB_NAME}")
+    logger.info("=" * 70)
+
+    # Step 1: Database Connectivity Check
+    logger.info("[Startup 1/3] Verifying PostgreSQL database connection...")
+    try:
+        from backend.core.database import check_database_connection
+        db_ok = check_database_connection()
+        if db_ok:
+            logger.info("[Startup 1/3] Database connection successfully verified.")
+        else:
+            logger.warning("[Startup 1/3] Database connection check returned False. Verify DB credentials.")
+    except Exception as exc:
+        logger.error(f"[Startup 1/3] Database connection check failed with exception: {exc}")
+
+    # Step 2: System Registries Inspection (Agents & Prompts)
+    logger.info("[Startup 2/3] Checking system registries (Agents & Prompts)...")
+    try:
+        from backend.core.database import SessionLocal
+        from backend.db.repositories.registry_repository import RegistryRepository
+        with SessionLocal() as db:
+            repo = RegistryRepository(db)
+            agents = repo.get_active_agents()
+            agent_names = [a.name for a in agents]
+            if agents:
+                logger.info(f"[Startup 2/3] Registries loaded: {len(agents)} active agent(s) available: {agent_names}")
+            else:
+                logger.warning("[Startup 2/3] Registries verified but 0 active agents found. Please seed the database.")
+    except Exception as exc:
+        logger.warning(f"[Startup 2/3] Registry inspection deferred (tables not yet created or pending migration): {exc}")
+
+    # Step 3: Vector Store & Storage Check
+    logger.info("[Startup 3/3] Checking storage paths and vector store index...")
+    if os.path.exists(CONFIG.VECTOR_STORE_PATH):
+        logger.info(f"[Startup 3/3] FAISS vector store index detected at: {CONFIG.VECTOR_STORE_PATH}")
+    else:
+        logger.info(f"[Startup 3/3] Vector store index not found at '{CONFIG.VECTOR_STORE_PATH}' (will initialize on first document upload).")
+
+    logger.info("  DocChat Enterprise AI Platform Ready to Serve Traffic.")
+    logger.info("=" * 70)
+
+    yield
+
+    # Graceful shutdown
+    logger.info("DocChat Enterprise AI Platform shutting down...")
+    try:
+        from backend.core.database import engine
+        engine.dispose()
+        logger.info("Database connection pool disposed cleanly.")
+    except Exception as exc:
+        logger.error(f"Error disposing database engine: {exc}")
+    logger.info("DocChat shutdown complete.")
+
+
 app = FastAPI(
     title="DocChat Enterprise API",
     description="Enterprise-grade layered REST API for document ingestion and conversational RAG.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 1. CORS Middleware

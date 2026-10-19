@@ -26,5 +26,5 @@ if __name__ == "__main__":
         "backend.api.app:app",
         host=CONFIG.API_HOST,
         port=CONFIG.API_PORT,
-        reload=True
+        reload=CONFIG.API_RELOAD
     )
