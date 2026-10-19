@@ -1,0 +1,61 @@
+{
+  "prompts": [
+    {
+      "name": "supervisor_prompt_v1",
+      "version": "1.0",
+      "description": "Routing prompt for the central supervisor agent.",
+      "input_variables": ["available_agents", "user_query"],
+      "template_text": "You are the central Supervisor of DocChat Enterprise Multi-Agent System.\nYour mission is to understand user intent and select the single most appropriate worker agent from the authorized agents list.\n\nAvailable Authorized Agents:\n{available_agents}\n\nRules:\n1. If the query asks about uploaded documents, PDFs, company policies, or file contents, route to 'rag_agent'.\n2. If the query asks for real-time web info, live news, external public facts, or current events, route to 'web_search_agent'.\n3. If the query is a simple greeting (e.g. 'hello', 'hi'), route to 'FINISH' and provide a friendly response.\n4. Always output your routing decision accurately.",
+      "is_active": true
+    },
+    {
+      "name": "rag_agent_prompt_v1",
+      "version": "1.0",
+      "description": "Specialized prompt for document-grounded retrieval and QA.",
+      "input_variables": ["context", "question"],
+      "template_text": "You are the DocChat Document Specialist Agent.\nYour mission is to answer questions strictly using the user's uploaded documents and indexed knowledge base.\n\nGuidelines:\n1. Answer the question using the retrieved grounded context from indexed documents.\n2. If the documents do not contain the answer, explicitly state that the information is not present in the indexed files.\n3. Keep your answers factual, concise, and include relevant source references whenever available.",
+      "is_active": true
+    },
+    {
+      "name": "web_search_prompt_v1",
+      "version": "1.0",
+      "description": "Specialized prompt for real-time web research.",
+      "input_variables": ["question"],
+      "template_text": "You are the DocChat Web Research Specialist Agent.\nYour mission is to research real-time facts, news, and external information from the web.\n\nGuidelines:\n1. Find verified, up-to-date facts, current events, and live information.\n2. Synthesize clear, well-structured answers citing key sources or references found.\n3. Keep responses objective, professional, and directly focused on the user query.",
+      "is_active": true
+    }
+  ],
+  "tools": [],
+  "agents": [
+    {
+      "name": "supervisor",
+      "display_name": "Supervisor Orchestrator",
+      "description": "Central coordinator that evaluates intent, checks permissions, and routes tasks to the best agent.",
+      "agent_type": "SUPERVISOR",
+      "prompt_name": "supervisor_prompt_v1",
+      "prompt_version": "1.0",
+      "temperature": 0.0,
+      "is_active": true
+    },
+    {
+      "name": "rag_agent",
+      "display_name": "Document Retrieval Specialist",
+      "description": "Answers questions based strictly on uploaded files and company documents.",
+      "agent_type": "WORKER",
+      "prompt_name": "rag_agent_prompt_v1",
+      "prompt_version": "1.0",
+      "temperature": 0.0,
+      "is_active": true
+    },
+    {
+      "name": "web_search_agent",
+      "display_name": "Live Web Search Specialist",
+      "description": "Searches the live internet for recent news, market data, and external web knowledge.",
+      "agent_type": "WORKER",
+      "prompt_name": "web_search_prompt_v1",
+      "prompt_version": "1.0",
+      "temperature": 0.0,
+      "is_active": true
+    }
+  ]
+}

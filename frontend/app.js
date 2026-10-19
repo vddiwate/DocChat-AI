@@ -26,12 +26,14 @@ function initApp() {
     // DOM Elements
     const dropzone = document.getElementById("dropzone");
     const fileInput = document.getElementById("fileInput");
-    const promptForm = document.getElementById("promptForm");
     const queryInput = document.getElementById("queryInput");
     const sendBtn = document.getElementById("sendBtn");
+    const addFilesBtn = document.getElementById("addFilesBtn");
+    const webSearchBtn = document.getElementById("webSearchBtn");
     const clearChatBtn = document.getElementById("clearChatBtn");
+    const manageDocsBtn = document.getElementById("manageDocsBtn");
 
-    if (!dropzone || !queryInput || !promptForm) {
+    if (!queryInput || !sendBtn) {
         console.error("[DocChat] Critical DOM elements missing!");
         return;
     }
@@ -43,39 +45,63 @@ function initApp() {
     autoResizeTextarea();
 
     // 2. Dropzone & File Upload Listeners
-    dropzone.onclick = () => {
-        console.log("[DocChat] Dropzone clicked, opening file dialog...");
-        fileInput.click();
-    };
+    if (dropzone && fileInput) {
+        dropzone.onclick = () => {
+            console.log("[DocChat] Dropzone clicked, opening file dialog...");
+            fileInput.click();
+        };
 
-    fileInput.onchange = (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-            console.log("[DocChat] File selected:", e.target.files[0].name);
-            uploadFile(e.target.files[0]);
-        }
-    };
+        fileInput.onchange = (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                console.log("[DocChat] File selected:", e.target.files[0].name);
+                uploadFile(e.target.files[0]);
+            }
+        };
 
-    dropzone.ondragover = (e) => {
-        e.preventDefault();
-        dropzone.classList.add("dragover");
-    };
+        dropzone.ondragover = (e) => {
+            e.preventDefault();
+            dropzone.classList.add("dragover");
+        };
 
-    dropzone.ondragleave = () => {
-        dropzone.classList.remove("dragover");
-    };
+        dropzone.ondragleave = () => {
+            dropzone.classList.remove("dragover");
+        };
 
-    dropzone.ondrop = (e) => {
-        e.preventDefault();
-        dropzone.classList.remove("dragover");
-        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            console.log("[DocChat] File dropped:", e.dataTransfer.files[0].name);
-            uploadFile(e.dataTransfer.files[0]);
-        }
-    };
+        dropzone.ondrop = (e) => {
+            e.preventDefault();
+            dropzone.classList.remove("dragover");
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                console.log("[DocChat] File dropped:", e.dataTransfer.files[0].name);
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        };
+    }
+
+    // Add Files button on prompt dock
+    if (addFilesBtn && fileInput) {
+        addFilesBtn.onclick = () => {
+            fileInput.click();
+        };
+    }
+
+    // Web Search button toggle
+    if (webSearchBtn) {
+        webSearchBtn.onclick = () => {
+            webSearchBtn.classList.toggle("active");
+            const isActive = webSearchBtn.classList.contains("active");
+            showToast(isActive ? "Web Search enabled" : "Web Search disabled", "success");
+        };
+    }
+
+    // Manage Docs button
+    if (manageDocsBtn && fileInput) {
+        manageDocsBtn.onclick = () => {
+            fileInput.click();
+        };
+    }
 
     // 3. Prompt Submission & Enter Key Listener
-    promptForm.onsubmit = (e) => {
-        e.preventDefault();
+    sendBtn.onclick = () => {
         handleUserQuery();
     };
 
